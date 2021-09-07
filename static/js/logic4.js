@@ -1,0 +1,132 @@
+
+// Store our API endpoint as queryUrl.
+var queryUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson"
+
+var TectonicPlatesGeoJSON = "GeoJSON/PB2002_boundaries.json";
+
+
+// Perform a GET request to the query URL
+d3.json(queryUrl, function(earthquake_data) {
+  // Once we get a response, send the data.features object to the createFeatures function
+  d3.json(TectonicPlatesGeoJSON,function(tectonicplates_data){
+    createFeatures(earthquake_data.features,tectonicplates_data.features);
+  });
+  
+});
+
+function createFeatures(earthquakeData,tectonicplatesData) {
+
+  // Define a function we want to run once for each feature in the features array
+  // Give each feature a popup describing the place and time of the earthquake
+  function onEachFeature(feature, layer) {
+    layer.bindPopup("<h2>" + feature.properties.title +
+      "</h2><hr><h3>Time:" + new Date(feature.properties.time) +"</a></h3><h3>"+`Mag: ${feature.properties.mag}`+"</h3><h3>"+`Type: ${feature.properties.type}`+"</h3><h4>"+`Rms: ${feature.properties.rms}`+"</h4>");
+      
+     }
+    
+   
+  // Create Earthquakes and TetonicPlates GeoJSON layers containing the features 
+  var earthquakes = L.geoJSON(earthquakeData, {
+    onEachFeature: onEachFeature,
+    
+    pointToLayer: function (feature, latlng) {
+      return L.circle(latlng, {
+      stroke: false,
+      fillOpacity: 0.75,
+      color: "black",
+      fillColor: getColor(feature.properties.mag),
+      radius: feature.properties.mag*15000
+      });
+    }
+  })
+  
+  var tectonicplates = L.geoJSON(tectonicplatesData, {
+      pointToLayer: function (feature, latlng) {
+			return L.marker(latlng);
+    }
+  });
+
+ // Create Map
+  createMap(earthquakes,tectonicplates);
+}
+
+// Legend Color
+function getColor(d){
+    return d > 5 ? '#333300' :
+           d > 4  ? '#866600' :
+           d > 3  ? '#999900' :
+           d > 2  ? '#CCCC00' :
+           d > 1   ? '#FFFF00' :
+           d > 0   ? '#FFFF66' :
+                     '#FFFFCC';
+
+}
+
+function createMap(earthquakes,tectonicplates) {
+
+
+
+  // Create the base layers.
+  var street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  })
+
+  var topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+  });
+
+  // Create a baseMaps object.
+  var baseMaps = {
+    "Street Map": street,
+    "Topographic Map": topo
+  };
+
+  // Create an overlay object to hold our overlay.
+  var overlayMaps = {
+    Earthquakes: earthquakes,
+    TectonicPlates: tectonicplates
+  };
+
+  // Create our map, giving it the streetmap and earthquakes layers to display on load.
+  var map = L.map("map", {
+    center: [
+      37.09, -95.71
+    ],
+    zoom: 2,
+    layers: [street, earthquakes]
+  });
+
+  // Create a layer control.
+  // Pass it our baseMaps and overlayMaps.
+  // Add the layer control to the map.
+  L.control.layers(baseMaps, overlayMaps, {
+    collapsed: false
+  }).addTo(map);
+
+ 
+
+
+}
+
+//Add Legend
+
+function addLegend(map){
+
+
+    var legend = L.control({position: 'bottomright'});
+    
+        legend.onAdd = function () {
+    
+        var div = L.DomUtil.create('div', 'info legend');
+        var level = [0, 1, 2, 3, 4, 5];
+        var divItem =[];
+        
+        for (var i = 0; i < level.length; i++) {
+          divItem.push("<i style=background:"+getColor(level[i] + 1)+"></i>" + level[i] + (level[i + 1] ? " - " + level[i + 1]:"+"));
+        }
+        div.innerHTML = divItem.join('<br>');
+        return div;
+      };
+    
+      legend.addTo(map);
+    }
